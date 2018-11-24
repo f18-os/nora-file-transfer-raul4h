@@ -31,6 +31,7 @@ class ServerThread(Thread):
         self.start()
     def run(self):
         while True:
+
             msg = self.fsock.receivemsg()
             if not msg:
                 if self.debug: print(self.fsock, "server thread done")
@@ -38,8 +39,20 @@ class ServerThread(Thread):
             requestNum = ServerThread.requestCount
             time.sleep(0.001)
             ServerThread.requestCount = requestNum + 1
-            msg = ("%s! (%d)" % (msg, requestNum)).encode()
-            self.fsock.sendmsg(msg)
+
+            inputFile = msg.decode()
+            fileExist = os.path.isfile("uploadServer/" + inputFile)
+            self.fsock.sendmsg(b"Ready")
+            openedFile = open('uploadServer/' + inputFile, "w")
+
+            data = self.fsock.receivemsg()
+            while(data.decode() != "exit"):
+                #print("Reading: " + data.decode())
+                openedFile.write(data.decode())
+                data = self.fsock.receivemsg()
+            openedFile.close()
+            print("Recieved:", inputFile)
+
 
 
 while True:

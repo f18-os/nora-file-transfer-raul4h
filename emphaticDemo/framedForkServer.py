@@ -25,14 +25,18 @@ while True:
     from framedSock import FramedStreamSock
     sock, addr = lsock.accept()
     fsock = FramedStreamSock(sock, debug)
+    lock = threading.Lock(fsock)
+    lock.aquire()
 
     if not os.fork():
         print("new child process handling connection from", addr)
         while True:
             payload = fsock.receivemsg()
+            print(payload)
             if debug: print("rec'd: ", payload)
             if not payload:
                 if debug: print("child exiting")
                 sys.exit(0)
             payload += b"!"             # make emphatic!
             fsock.sendmsg(payload)
+            lock.release()

@@ -1,10 +1,10 @@
 #! /usr/bin/env python3
 
 # Echo client program
-import socket, sys, re
+import socket, sys, re, os
 import params
 from framedSock import FramedStreamSock
-from threading import Thread
+from threading import Thread, Lock
 import time
 
 switchesVarDefaults = (
@@ -14,10 +14,18 @@ switchesVarDefaults = (
     )
 
 
+inputFile = input("Please enter file name: ")
+
+if(not os.path.isfile(inputFile)):
+    print("No such file exist")
+    exit()
+
 progname = "framedClient"
 paramMap = params.parseParams(switchesVarDefaults)
 
 server, usage, debug  = paramMap["server"], paramMap["usage"], paramMap["debug"]
+
+lock = Lock()
 
 if usage:
     params.usage()
@@ -40,17 +48,17 @@ class ClientThread(Thread):
        for res in socket.getaddrinfo(serverHost, serverPort, socket.AF_UNSPEC, socket.SOCK_STREAM):
            af, socktype, proto, canonname, sa = res
            try:
-               print("creating sock: af=%d, type=%d, proto=%d" % (af, socktype, proto))
+               #print("creating sock: af=%d, type=%d, proto=%d" % (af, socktype, proto))
                s = socket.socket(af, socktype, proto)
            except socket.error as msg:
-               print(" error: %s" % msg)
+               #print(" error: %s" % msg)
                s = None
                continue
            try:
-               print(" attempting to connect to %s" % repr(sa))
+               #print(" attempting to connect to %s" % repr(sa))
                s.connect(sa)
            except socket.error as msg:
-               print(" error: %s" % msg)
+               #print(" error: %s" % msg)
                s.close()
                s = None
                continue
@@ -62,14 +70,29 @@ class ClientThread(Thread):
 
        fs = FramedStreamSock(s, debug=debug)
 
+       lock.acquire()
 
-       print("sending hello world")
-       fs.sendmsg(b"hello world")
-       print("received:", fs.receivemsg())
+       print("Sending " + inputFile)
+       fs.sendmsg(inputFile.encode())
+       payload = fs.receivemsg()
+       if(payload.decode() == "Ready"):
+           sentFile = open(inputFile, "r")
+           data = sentFile.read(100)
+           while(data):
+               fs.sendmsg(data.encode())
+               time.sleep(0.001)
+               data = sentFile.read(100)
+           fs.sendmsg(b"exit")
+       lock.release()
 
-       fs.sendmsg(b"hello world")
-       print("received:", fs.receivemsg())
 
-for i in range(100):
+
+       # print("sending hello world")
+       # fs.sendmsg(b"hello world")
+       # print("received:", fs.receivemsg())
+
+       # fs.sendmsg(b"hello world")
+       # print("received:", fs.receivemsg())
+
+for i in range(10):
     ClientThread(serverHost, serverPort, debug)
-
